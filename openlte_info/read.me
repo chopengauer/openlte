@@ -1,0 +1,139 @@
+huanglin.bupt@gmail.com
+
+
+OPERATOR_key = "1006020f0a478bf6b699f15c062e42b3"; # OP key matching your database
+static const uint8 OP[16] = {0x10, 0x06, 0x02, 0x0f, 0x0a, 0x47, 0x8b, 0xf6, 0xb6, 0x99, 0xf1, 0x5c, 0x06, 0x2e, 0x42, 0xb3};
+
+
+
+write use_cnfg_file 1
+write use_user_file 1
+write band 1
+write bandwidth 5
+write dl_earfcn 25
+add_user imsi=901700000007768 imei=353490067465068 k=F94B491187C5ACE29BEA49ACDBB11F43
+write rx_gain 40
+write tx_gain 80
+write mcc 901
+write mnc 70
+start
+
+write use_cnfg_file 1
+write use_user_file 1
+write band 7
+write bandwidth 5
+write dl_earfcn 3400
+add_user imsi=208920100001101 imei=353490067465068 k=6874736969202073796d4b2079650a73
+write rx_gain 40
+write tx_gain 80
+write mcc 208
+write mnc 92
+start
+
+
+
+OpenLTE source code (1/3)
+in current openlte release, the TAU request ins`t handled
+
+case LIBLTE_MME_MSG_TYPE_TRACKING_AREA_UPDATE_REQUEST:
+    interface->send_debug_msg(LTE_FDD_ENB_DEBUG_TYPE_ERROR,
+                              LTE_FDD_ENB_DEBUG_LEVEL_MME,
+                              __FILE__,
+                              __LINE__,
+                              "Not handling Tracking Area Update Request");
+
+but TAU reject msg packing function is avaliable.
+
+LIBLTE_ERROR_ENUM liblte_mme_pack_tracking_area_update_reject_msg(LIBLTE_MME_TRACKING_AREA_UPDATE_REJECT_MSG_STRUCT *ta_update_rej,
+                                                                  uint8                                              sec_hdr_type,
+                                                                  uint8                                             *key_256,
+                                                                  uint32                                             count,
+                                                                  uint8                                              direction,
+                                                                  LIBLTE_BYTE_MSG_STRUCT                            *msg)
+
+So we could add some codes to handle TAU case and give appropriate TAU reject cause
+
+ue->bs tau request
+ue<-bs tau reject
+ue->bs attach request (imsi)
+
+
+
+
+OpenLTE source code (2/3)
+Dos attack can directly utilize the cause aetting in Attach Reject message.
+
+void LTE_fdd_enb_mme::send_attach_reject(LTE_fdd_enb_user *user,
+                                         LTE_fdd_enb_rb   *rb)
+{
+    LTE_FDD_ENB_RRC_NAS_MSG_READY_MSG_STRUCT nas_msg_ready;
+    LIBLTE_MME_ATTACH_REJECT_MSG_STRUCT      attach_rej;
+    LIBLTE_BYTE_MSG_STRUCT                   msg;
+    uint64                                   imsi_num;
+
+    if(user->is_id_set())
+    {
+        imsi_num = user->get_id()->imsi;
+    }else{
+        imsi_num = user->get_temp_id();
+    }
+
+    attach_rej.emm_cause           = user->get_emm_cause();
+    attach_rej.esm_msg_present     = false;
+    attach_rej.t3446_value_present = false;
+    liblte_mme_pack_attach_reject_msg(&attach_rej, &msg);
+    interface->send_debug_msg(LTE_FDD_ENB_DEBUG_TYPE_INFO,
+                              LTE_FDD_ENB_DEBUG_LEVEL_MME,
+
+ue->bs tau request
+ue<-bs tau reject
+ue->bs attach request (imsi)
+ue<-bs attach reject (cause #3, 7, 8, 14)
+
+
+OpenLTE source code (2/3)
+redirecrCarrierInfo can be inserted into RRC Connection Release message
+
+LIBLTE_ERROR_ENUM liblte_rrc_pack_rrc_connection_release_msg(LIBLTE_RRC_CONNECTION_RELEASE_STRUCT *con_release,
+                                                             LIBLTE_BIT_MSG_STRUCT                *msg)
+{
+    LIBLTE_ERROR_ENUM  err     = LIBLTE_ERROR_INVALID_INPUTS;
+    uint8             *msg_ptr = msg->msg;
+
+    if(con_release != NULL &&
+       msg         != NULL)
+    {
+        // RRC Transaction ID
+        liblte_rrc_pack_rrc_transaction_identifier_ie(con_release->rrc_transaction_id,
+                                                      &msg_ptr);
+
+        // Extension choice
+        liblte_value_2_bits(0, &msg_ptr, 1);
+
+        // C1 choice
+        liblte_value_2_bits(0, &msg_ptr, 2);
+
+        // Optional indicators
+        liblte_value_2_bits(0, &msg_ptr, 1);
+        liblte_value_2_bits(0, &msg_ptr, 1);
+        liblte_value_2_bits(0, &msg_ptr, 1);
+
+        // Release cause
+        liblte_value_2_bits(con_release->release_cause, &msg_ptr, 2);
+
+
+releaseCause: other
+redirectionCarrierInfo:geran
+ geran:
+   startingARFCN:42
+   bandindicator:dcs1800
+   followingARFCNs:explicitListOfARFCNs
+    explicitListOfARFCNs: 1 item
+     item 0
+     ARFCN-ValueGERAN: 42
+
+ue->bs tau request
+ue<-bs tau reject
+ue->bs attach request (imsi)
+ue<-bs attach reject (cause #3, 7, 8, 14)
+ue<-bs rrc connection release redirectedCarrierInfo

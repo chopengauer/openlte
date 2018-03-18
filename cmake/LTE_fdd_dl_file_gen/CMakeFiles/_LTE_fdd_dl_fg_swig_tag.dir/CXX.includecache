@@ -1,0 +1,10 @@
+#IncludeRegexLine: ^[ 	]*#[ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/opt/openlte_v00-20-05/cmake/LTE_fdd_dl_file_gen/_LTE_fdd_dl_fg_swig_tag.cpp
+

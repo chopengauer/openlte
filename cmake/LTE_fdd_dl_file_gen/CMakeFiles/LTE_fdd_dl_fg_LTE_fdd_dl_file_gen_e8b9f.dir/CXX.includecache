@@ -1,0 +1,10 @@
+#IncludeRegexLine: ^[ 	]*#[ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/opt/openlte_v00-20-05/cmake/LTE_fdd_dl_file_gen/LTE_fdd_dl_fg_LTE_fdd_dl_file_gen_e8b9f.cpp
+
